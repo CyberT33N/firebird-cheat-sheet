@@ -111,6 +111,15 @@ docker exec -it dev-environment-firebird-1 /usr/local/firebird/bin/gsec -user SY
 ```
 </details>
 
+<details><summary>▶️ Mounted dbs (.fdb) ansehen</summary>
+
+```shell
+docker exec -it dev-environment-firebird-1 ls firebird/data
+```
+</details>
+
+---
+
 <details><summary>▶️ Firebird Logs ansehen</summary>
 
 ```shell
