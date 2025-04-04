@@ -1,6 +1,4 @@
-Okay, ich führe den generierten Prompt jetzt aus und extrahiere die Firebird 2.5 SQL-Sprachreferenz aus dem bereitgestellten OCR-Text. Das Ergebnis wird ein umfassendes Markdown-Dokument sein, das für LLMs optimiert ist.
 
-```markdown
 # Firebird 2.5 SQL Language Reference (LLM Summary)
 
 Dieses Dokument fasst die SQL-Sprachelemente von Firebird 2.5 zusammen, basierend auf der "Firebird 2.5 Language Reference". Es ist als Referenz für Large Language Models (LLMs) gedacht.
