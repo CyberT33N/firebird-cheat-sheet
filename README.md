@@ -52,7 +52,11 @@ docker exec -it dev-environment-firebird-1 ls -l /firebird/data/
 ---
 
 # 🔥 Firebird 2.5.8-ss  
+
+Method #1
 🔗 [Docker Hub](https://hub.docker.com/layers/jacobalberty/firebird/2.5.8-ss/images/sha256-0749a634c0fed18ef60ad18e0634d9f48822ab7a7aab2f708630288ad96f48f1)  
+
+<details><summary>Click to expand..</summary>
 
 ### 🛠️ Docker-Compose  
 ```yaml
@@ -82,6 +86,143 @@ services:
       timeout: 10s
       retries: 3
 ```
+
+</details>
+
+
+Method #2 - Build yourself
+
+<details><summary>Click to expand..</summary>
+
+docker-compose.yml
+```
+# .docker/docker-compose.yml
+
+services:
+  firebird:
+    extends:
+      file: services/firebird/service.yml # Pfad prüfen!
+      service: firebird
+
+# Volumes HIER deklarieren (inkl. firebird_log)
+volumes:
+  firebird_data:
+  firebird_etc:
+  firebird_log: # Neues Volume für Logs deklarieren
+```
+
+services/firebird/service.yml
+```
+# services/firebird/service.yml
+
+version: '3.8'
+
+services:
+  firebird:
+    build:
+      context: .
+    environment:
+      # Umgebungsvariablen bleiben wichtig für das entrypoint.sh
+      - ISC_PASSWORD=masterkey # Urspr. Passwort, das entrypoint.sh erwartet, um es zu ändern
+      - FIREBIRD_PASSWORD=test # Das neue Passwort, das gesetzt werden soll
+      - FIREBIRD_DATABASE=testdb.fdb # Datenbankname für Initialisierung (falls unterstützt)
+      # Variablen wie EnableLegacyClientAuth, EnableWireCrypt, DataTypeCompatibility sind möglicherweise
+      # nicht mehr relevant oder müssen in /etc/firebird/2.5/firebird.conf gesetzt werden. Teste erstmal ohne.
+      - TZ=Europe/Berlin
+    ports:
+      - "3050:3050"
+    volumes:
+      # --- Korrigierte Zielpfade für das Ubuntu-basierte Image ---
+      - firebird_data:/var/lib/firebird/2.5/data  # Korrekter Datenpfad
+      - firebird_etc:/etc/firebird/2.5           # Korrekter Konfigurationspfad
+      - firebird_log:/var/log/firebird           # Hinzugefügter Logpfad
+      # Das Volume firebird_system wird wahrscheinlich nicht mehr benötigt
+      # ---------------------------------------------------------
+    healthcheck:
+      # Healthcheck bleibt erstmal gleich, testet Port 3050
+      test: ["CMD-SHELL", "nc -z localhost 3050"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# KEIN Top-Level volumes: Block hier!
+```
+
+services/firebird/install.sh
+```
+#!/bin/bash
+
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EF648708 && \
+echo "deb http://ppa.launchpad.net/mapopa/ppa/ubuntu xenial main" > /etc/apt/sources.list.d/firebird.list && \
+apt-get update && \
+apt-get install -y -qqq firebird${FIREBIRD_VERSION}-${FIREBIRD_ARCHITECTURE} && \
+apt-get autoremove -y && \
+apt-get clean all  && \
+rm -rf /var/lib/apt/lists/*
+sed -ri 's/RemoteBindAddress = localhost/RemoteBindAddress = 0.0.0.0/g' /etc/firebird/${FIREBIRD_VERSION}/firebird.conf
+```
+
+services/firebird/entrypoint.sh
+```
+#!/bin/bash
+
+# --- Temporär auskommentiert für Debugging ---
+# if [ -n "${FIREBIRD_PASSWORD}" ]
+# then
+#   if [ -f /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password ]
+#   then
+#     source /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password
+#     # gsec -user "${ISC_USER}" -password "${ISC_PASSWORD}" -modify sysdba -pw ${FIREBIRD_PASSWORD} # Führt zu früh aus!
+#     sed -ri 's/ISC_PASSWORD="[^"]+"/ISC_PASSWORD="'${FIREBIRD_PASSWORD}'"/g' /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password
+#   else
+#     # gsec -user sysdba -password masterkey -modify sysdba -pw "${FIREBIRD_PASSWORD}" # Führt zu früh aus!
+#     echo "ISC_USER=sysdba" > /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password
+#     echo "ISC_PASSWORD=\"${FIREBIRD_PASSWORD}\"" >> /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password
+#   fi
+# fi
+# --------------------------------------------
+
+echo "Starting Firebird server in foreground..."
+# Starte den Server direkt im Vordergrund
+# services/firebird/entrypoint.sh
+#!/bin/bash
+
+# ... (auskommentierter gsec-Teil bleibt) ...
+
+echo "Starting Firebird server in foreground..."
+# Korrekter Pfad und Befehl für den SuperServer
+/usr/sbin/fbserver -m
+
+# Hinweis: Das Skript wird hier blockiert, solange der Server läuft.
+#          Das ist korrektes Verhalten für einen Docker-Container.
+```
+
+masterkey.sh
+```
+#!/bin/bash
+
+if [ -f /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password ]
+then
+  source /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password
+  gsec -user "${ISC_USER}" -password "${ISC_PASSWORD}" -modify sysdba -pw masterkey
+  sed -ri 's/ISC_PASSWORD="[^"]+"/ISC_PASSWORD="masterkey"/g' /etc/firebird/${FIREBIRD_VERSION}/SYSDBA.password
+fi
+```
+
+Then run:
+```
+docker-compose -f .docker/docker-compose.yml up --build firebird
+```
+
+
+
+</details>
+
+
+
+
+
+
 
 ---
 
